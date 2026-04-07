@@ -1,10 +1,84 @@
 use clap::Parser;
-use log::{error, info};
+use log::{error, info, debug};
 use oslog::OsLogger;
 use std::process::Stdio;
-use tokio::io::{self, AsyncBufReadExt, BufReader};
+use tokio::io::{self, AsyncBufReadExt, AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt, BufReader};
 use tokio::process::Command;
 use tokio::signal;
+
+async fn proxy_and_log_stream<R, W>(
+    reader: R,
+    mut writer: W,
+    direction_tag: &str,
+) -> io::Result<()>
+where
+    R: AsyncRead + Unpin,
+    W: AsyncWrite + Unpin,
+{
+    let mut buf_reader = BufReader::new(reader);
+    let mut header_buf = String::new();
+
+    loop {
+        header_buf.clear();
+        // Read the first line to determine framing
+        let bytes_read = buf_reader.read_line(&mut header_buf).await?;
+        if bytes_read == 0 {
+            break; // EOF
+        }
+
+        if header_buf.starts_with("Content-Length:") {
+            // --- Header-Delimited (LSP/DAP) ---
+            let mut content_length: usize = 0;
+            
+            // Parse the Content-Length value
+            if let Some(len_str) = header_buf.trim().strip_prefix("Content-Length:") {
+                if let Ok(len) = len_str.trim().parse::<usize>() {
+                    content_length = len;
+                }
+            }
+
+            // Write the first header line to the destination
+            writer.write_all(header_buf.as_bytes()).await?;
+
+            // Read the rest of the headers until \r\n\r\n
+            loop {
+                header_buf.clear();
+                let n = buf_reader.read_line(&mut header_buf).await?;
+                if n == 0 {
+                    break;
+                }
+                writer.write_all(header_buf.as_bytes()).await?;
+                
+                if header_buf == "\r\n" || header_buf == "\n" {
+                    break; // End of headers
+                }
+            }
+
+            // Read the exact payload
+            let mut payload = vec![0u8; content_length];
+            buf_reader.read_exact(&mut payload).await?;
+            
+            // Log and forward
+            if let Ok(payload_str) = std::str::from_utf8(&payload) {
+                info!("[{}] {}", direction_tag, payload_str);
+            } else {
+                debug!("[{}] <binary payload of {} bytes>", direction_tag, content_length);
+            }
+            writer.write_all(&payload).await?;
+            writer.flush().await?;
+
+        } else {
+            // --- Newline-Delimited (MCP) or raw text ---
+            let trimmed = header_buf.trim();
+            if !trimmed.is_empty() {
+                info!("[{}] {}", direction_tag, trimmed);
+            }
+            writer.write_all(header_buf.as_bytes()).await?;
+            writer.flush().await?;
+        }
+    }
+    Ok(())
+}
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
@@ -44,23 +118,24 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             e
         })?;
 
-    let mut child_stdin = child.stdin.take().unwrap();
-    let mut child_stdout = child.stdout.take().unwrap();
+    let child_stdin = child.stdin.take().unwrap();
+    let child_stdout = child.stdout.take().unwrap();
     let child_stderr = child.stderr.take().unwrap();
 
     // Task: Proxy stdin (parent) -> stdin (child)
     let _stdin_task = tokio::spawn(async move {
-        let mut stdin = io::stdin();
-        if let Err(e) = io::copy(&mut stdin, &mut child_stdin).await {
-            error!("Error copying from stdin to child: {}", e);
+        let stdin = io::stdin();
+        if let Err(e) = proxy_and_log_stream(stdin, child_stdin, "Client -> Server").await {
+            error!("Error proxying stdin to child: {}", e);
         }
+        // child_stdin will be dropped here, closing the pipe to the child process
     });
 
     // Task: Proxy stdout (child) -> stdout (parent)
     let stdout_task = tokio::spawn(async move {
-        let mut stdout = io::stdout();
-        if let Err(e) = io::copy(&mut child_stdout, &mut stdout).await {
-            error!("Error copying from child stdout to parent: {}", e);
+        let stdout = io::stdout();
+        if let Err(e) = proxy_and_log_stream(child_stdout, stdout, "Server -> Client").await {
+            error!("Error proxying child stdout to parent: {}", e);
         }
     });
 
