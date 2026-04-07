@@ -1,0 +1,16 @@
+{
+    "mcpServers": {
+        "flight-engineer": {
+            "command": "/Users/paal/Documents/GitHub/workspace/tools/jsonrpc-stdio-proxy/target/release/jsonrpc-stdio-proxy",
+            "args": [
+            	"--subsystem",
+            	"com.paaloeye.flight.engineer",
+            	"--",
+            	"/Users/paal/Documents/GitHub/workspace/benches/swift/flight-engineer/.tmp/DerivedData/Build/Products/Debug/Run",
+            	"mcpbridge"
+            ]
+        }
+    }
+}
+
+
