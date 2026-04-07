@@ -18,7 +18,7 @@ struct Metrics {
     server_to_client_messages: AtomicU64,
     server_to_client_bytes: AtomicU64,
     errors: AtomicU64,
-    
+
     // Latency tracking (Request ID -> Start Instant)
     pending_requests: DashMap<String, Instant>,
     latencies: dashmap::DashSet<Duration>,
@@ -68,17 +68,20 @@ where
         }
 
         let payload_to_log: Option<Vec<u8>>;
-        let total_bytes: usize;
+        let current_message_bytes: usize;
 
         if header_buf.starts_with("Content-Length:") {
             // --- Header-Delimited (LSP/DAP) ---
             let mut content_length: usize = 0;
             let mut bytes_acc = bytes_read;
 
-            if let Some(len_str) = header_buf.trim().strip_prefix("Content-Length:") {
-                if let Ok(len) = len_str.trim().parse::<usize>() {
-                    content_length = len;
+            match header_buf.trim().strip_prefix("Content-Length:") {
+                Some(len_str) => {
+                    if let Ok(len) = len_str.trim().parse::<usize>() {
+                        content_length = len;
+                    }
                 }
+                None => todo!(),
             }
 
             writer.write_all(header_buf.as_bytes()).await?;
@@ -95,16 +98,16 @@ where
             let mut payload = vec![0u8; content_length];
             buf_reader.read_exact(&mut payload).await?;
             bytes_acc += content_length;
-            
+
             writer.write_all(&payload).await?;
             writer.flush().await?;
-            
+
+            current_message_bytes = bytes_acc;
             payload_to_log = Some(payload);
-            total_bytes = bytes_acc;
 
         } else {
             // --- Newline-Delimited (MCP) ---
-            total_bytes = bytes_read;
+            current_message_bytes = bytes_read;
             let trimmed = header_buf.trim();
             if !trimmed.is_empty() {
                 payload_to_log = Some(header_buf.as_bytes().to_vec());
@@ -126,12 +129,10 @@ where
                     if let Some(id_val) = json.get("id") {
                         let id = id_val.to_string();
                         if is_client_to_server {
-                            // It's a request (has 'method', no 'result'/'error')
                             if json.get("method").is_some() && json.get("result").is_none() && json.get("error").is_none() {
                                 metrics.pending_requests.insert(id, Instant::now());
                             }
                         } else {
-                            // It's a response (server-to-client)
                             if json.get("result").is_some() || json.get("error").is_some() {
                                 if let Some((_, start)) = metrics.pending_requests.remove(&id) {
                                     metrics.latencies.insert(start.elapsed());
@@ -147,10 +148,10 @@ where
             // Update Global Metrics
             if is_client_to_server {
                 metrics.client_to_server_messages.fetch_add(1, Ordering::Relaxed);
-                metrics.client_to_server_bytes.fetch_add(total_bytes as u64, Ordering::Relaxed);
+                metrics.client_to_server_bytes.fetch_add(current_message_bytes as u64, Ordering::Relaxed);
             } else {
                 metrics.server_to_client_messages.fetch_add(1, Ordering::Relaxed);
-                metrics.server_to_client_bytes.fetch_add(total_bytes as u64, Ordering::Relaxed);
+                metrics.server_to_client_bytes.fetch_add(current_message_bytes as u64, Ordering::Relaxed);
             }
         }
     }
@@ -202,21 +203,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let m1 = Arc::clone(&metrics);
     let mut stdin_task = tokio::spawn(async move {
         let stdin = io::stdin();
-        let res = proxy_and_log_stream(stdin, child_stdin, "Client -> Server", m1, true).await;
-        if let Err(e) = &res {
-            error!("Error proxying stdin to child: {}", e);
-        }
-        res
+        proxy_and_log_stream(stdin, child_stdin, "Client -> Server", m1, true).await
     });
 
     let m2 = Arc::clone(&metrics);
     let stdout_task = tokio::spawn(async move {
         let stdout = io::stdout();
-        let res = proxy_and_log_stream(child_stdout, stdout, "Server -> Client", m2, false).await;
-        if let Err(e) = &res {
-            error!("Error proxying child stdout to parent: {}", e);
-        }
-        res
+        proxy_and_log_stream(child_stdout, stdout, "Server -> Client", m2, false).await
     });
 
     let stderr_task = tokio::spawn(async move {
@@ -238,39 +231,40 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             let _ = child.kill().await;
         }
         _ = &mut stdin_task => {
-            info!("Stdin closed, waiting for child to exit...");
-            // Optionally, we could kill the child here, but we wait for it to exit naturally (responding to EOF)
+            info!("Stdin closed, sending SIGTERM to child and waiting...");
+            // Standard proxy behavior: if the client closes stdin, the proxy is done.
+            // We should kill/terminate the child so it doesn't hang indefinitely.
+            let _ = child.kill().await;
             let _ = child.wait().await;
         }
     }
 
-    // Wait for stdout and stderr tasks to finish flushing (with a timeout)
-    let _ = tokio::time::timeout(Duration::from_millis(500), async {
-        let _ = tokio::join!(stdout_task, stderr_task);
-    }).await;
-
-    // Log Performance Metrics Summary
+    // Capture metrics immediately after child exit
     let session_duration = metrics.start_time.elapsed();
     let latencies: Vec<Duration> = metrics.latencies.iter().map(|d| *d).collect();
-    
+
     info!("--- Performance Metrics Summary ---");
     info!("Session Duration: {:?}", session_duration);
-    info!("Client -> Server: {} msgs, {} bytes", 
+    info!("Client -> Server: {} msgs, {} bytes",
         metrics.client_to_server_messages.load(Ordering::Relaxed),
         metrics.client_to_server_bytes.load(Ordering::Relaxed));
-    info!("Server -> Client: {} msgs, {} bytes", 
+    info!("Server -> Client: {} msgs, {} bytes",
         metrics.server_to_client_messages.load(Ordering::Relaxed),
         metrics.server_to_client_bytes.load(Ordering::Relaxed));
-    
+
     if !latencies.is_empty() {
         let min = latencies.iter().min().unwrap();
         let max = latencies.iter().max().unwrap();
         let avg = latencies.iter().sum::<Duration>() / latencies.len() as u32;
         info!("RTT Latency: Min {:?}, Max {:?}, Avg {:?}", min, max, avg);
     }
-    
     info!("Errors: {}", metrics.errors.load(Ordering::Relaxed));
-    info!("Proxy exiting.");
 
+    // Wait briefly for remaining stdout/stderr logs
+    let _ = tokio::time::timeout(Duration::from_millis(200), async {
+        let _ = tokio::join!(stdout_task, stderr_task);
+    }).await;
+
+    info!("Proxy exiting.");
     Ok(())
 }
