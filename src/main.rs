@@ -265,6 +265,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let _ = tokio::join!(stdout_task, stderr_task);
     }).await;
 
-    info!("Proxy exiting.");
+    info!("Proxy exiting");
     Ok(())
 }
