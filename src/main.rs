@@ -67,13 +67,13 @@ where
             break; // EOF
         }
 
-        let mut payload_to_log = None;
-        let mut total_bytes = 0;
+        let payload_to_log: Option<Vec<u8>>;
+        let total_bytes: usize;
 
         if header_buf.starts_with("Content-Length:") {
             // --- Header-Delimited (LSP/DAP) ---
             let mut content_length: usize = 0;
-            total_bytes = bytes_read;
+            let mut bytes_acc = bytes_read;
 
             if let Some(len_str) = header_buf.trim().strip_prefix("Content-Length:") {
                 if let Ok(len) = len_str.trim().parse::<usize>() {
@@ -87,18 +87,20 @@ where
                 header_buf.clear();
                 let n = buf_reader.read_line(&mut header_buf).await?;
                 if n == 0 { break; }
-                total_bytes += n;
+                bytes_acc += n;
                 writer.write_all(header_buf.as_bytes()).await?;
                 if header_buf == "\r\n" || header_buf == "\n" { break; }
             }
 
             let mut payload = vec![0u8; content_length];
             buf_reader.read_exact(&mut payload).await?;
-            total_bytes += content_length;
+            bytes_acc += content_length;
+            
+            writer.write_all(&payload).await?;
+            writer.flush().await?;
             
             payload_to_log = Some(payload);
-            writer.write_all(payload_to_log.as_ref().unwrap()).await?;
-            writer.flush().await?;
+            total_bytes = bytes_acc;
 
         } else {
             // --- Newline-Delimited (MCP) ---
@@ -106,6 +108,8 @@ where
             let trimmed = header_buf.trim();
             if !trimmed.is_empty() {
                 payload_to_log = Some(header_buf.as_bytes().to_vec());
+            } else {
+                payload_to_log = None;
             }
             writer.write_all(header_buf.as_bytes()).await?;
             writer.flush().await?;
@@ -122,8 +126,8 @@ where
                     if let Some(id_val) = json.get("id") {
                         let id = id_val.to_string();
                         if is_client_to_server {
-                            // It's a request (unless it has 'result'/'error', which is rare for client-to-server)
-                            if json.get("method").is_some() {
+                            // It's a request (has 'method', no 'result'/'error')
+                            if json.get("method").is_some() && json.get("result").is_none() && json.get("error").is_none() {
                                 metrics.pending_requests.insert(id, Instant::now());
                             }
                         } else {
@@ -196,19 +200,23 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let child_stderr = child.stderr.take().unwrap();
 
     let m1 = Arc::clone(&metrics);
-    let _stdin_task = tokio::spawn(async move {
+    let mut stdin_task = tokio::spawn(async move {
         let stdin = io::stdin();
-        if let Err(e) = proxy_and_log_stream(stdin, child_stdin, "Client -> Server", m1, true).await {
+        let res = proxy_and_log_stream(stdin, child_stdin, "Client -> Server", m1, true).await;
+        if let Err(e) = &res {
             error!("Error proxying stdin to child: {}", e);
         }
+        res
     });
 
     let m2 = Arc::clone(&metrics);
     let stdout_task = tokio::spawn(async move {
         let stdout = io::stdout();
-        if let Err(e) = proxy_and_log_stream(child_stdout, stdout, "Server -> Client", m2, false).await {
+        let res = proxy_and_log_stream(child_stdout, stdout, "Server -> Client", m2, false).await;
+        if let Err(e) = &res {
             error!("Error proxying child stdout to parent: {}", e);
         }
+        res
     });
 
     let stderr_task = tokio::spawn(async move {
@@ -229,8 +237,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             info!("Received Ctrl-C, terminating child process...");
             let _ = child.kill().await;
         }
+        _ = &mut stdin_task => {
+            info!("Stdin closed, waiting for child to exit...");
+            // Optionally, we could kill the child here, but we wait for it to exit naturally (responding to EOF)
+            let _ = child.wait().await;
+        }
     }
 
+    // Wait for stdout and stderr tasks to finish flushing (with a timeout)
     let _ = tokio::time::timeout(Duration::from_millis(500), async {
         let _ = tokio::join!(stdout_task, stderr_task);
     }).await;
@@ -256,6 +270,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
     
     info!("Errors: {}", metrics.errors.load(Ordering::Relaxed));
+    info!("Proxy exiting.");
 
     Ok(())
 }
