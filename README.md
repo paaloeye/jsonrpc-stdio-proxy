@@ -25,3 +25,13 @@
     }
 }
 
+
+## Apple OS log
+
+```nu
+log stream --predicate 'subsystem == "com.paaloeye.flight.engineer"' --debug --info
+
+# or
+
+log show --predicate 'subsystem == "com.paaloeye.flight.engineer"' --debug --info
+```
