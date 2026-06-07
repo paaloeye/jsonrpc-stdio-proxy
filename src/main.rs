@@ -6,6 +6,7 @@ use serde_json::Value;
 use std::process::Stdio;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
+use std::sync::Mutex;
 use std::time::{Duration, Instant};
 use tokio::io::{self, AsyncBufReadExt, AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt, BufReader};
 use tokio::process::Command;
@@ -215,10 +216,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         proxy_and_log_stream(child_stdout, stdout, "Server -> Client", m2, false).await
     });
 
+    let stderr_lines: Arc<Mutex<Vec<String>>> = Arc::new(Mutex::new(Vec::new()));
+    let stderr_lines_clone = Arc::clone(&stderr_lines);
     tokio::spawn(async move {
         let mut reader = BufReader::new(child_stderr).lines();
         while let Ok(Some(line)) = reader.next_line().await {
             info!("[child-stderr] {}", line);
+            stderr_lines_clone.lock().unwrap().push(line);
         }
     });
 
@@ -270,6 +274,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         info!("RTT Latency: Min {:?}, Max {:?}, Avg {:?}", min, max, avg);
     }
     info!("Errors: {}", metrics.errors.load(Ordering::Relaxed));
+
+    if exit_code != 0 {
+        let lines = stderr_lines.lock().unwrap();
+        if !lines.is_empty() {
+            eprintln!("jsonrpc-stdio-proxy: child process failed (exit code {})", exit_code);
+            for line in lines.iter() {
+                eprintln!("  {}", line);
+            }
+        }
+    }
 
     info!("Proxy exiting with code {}", exit_code);
 
