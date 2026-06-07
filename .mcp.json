@@ -6,7 +6,7 @@
             	"--subsystem",
             	"com.paaloeye.flight.engineer",
             	"--",
-            	"/Users/paal/Documents/GitHub/workspace/benches/swift/flight-engineer/.tmp/DerivedData/Build/Products/Debug/Run",
+            	"/usr/local/bin/ferun",
             	"mcpbridge"
             ]
         }

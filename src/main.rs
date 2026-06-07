@@ -64,7 +64,10 @@ where
         };
 
         if bytes_read == 0 {
-            break; // EOF
+            if is_client_to_server {
+                info!("[{}] EOF on stdin (Ctrl-D)", direction_tag);
+            }
+            break;
         }
 
         let payload_to_log: Option<Vec<u8>>;
@@ -207,37 +210,45 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     });
 
     let m2 = Arc::clone(&metrics);
-    let stdout_task = tokio::spawn(async move {
+    tokio::spawn(async move {
         let stdout = io::stdout();
         proxy_and_log_stream(child_stdout, stdout, "Server -> Client", m2, false).await
     });
 
-    let stderr_task = tokio::spawn(async move {
+    tokio::spawn(async move {
         let mut reader = BufReader::new(child_stderr).lines();
         while let Ok(Some(line)) = reader.next_line().await {
             info!("[child-stderr] {}", line);
         }
     });
 
-    tokio::select! {
+    let exit_code: i32 = tokio::select! {
         status = child.wait() => {
             match status {
-                Ok(s) => info!("Child process exited with status: {}", s),
-                Err(e) => error!("Error waiting for child process: {}", e),
+                Ok(s) => {
+                    let code = s.code().unwrap_or(if s.success() { 0 } else { 1 });
+                    info!("Child process exited with status: {}", s);
+                    code
+                }
+                Err(e) => {
+                    error!("Error waiting for child process: {}", e);
+                    1
+                }
             }
         }
         _ = signal::ctrl_c() => {
             info!("Received Ctrl-C, terminating child process...");
             let _ = child.kill().await;
+            let _ = child.wait().await;
+            0
         }
         _ = &mut stdin_task => {
-            info!("Stdin closed, sending SIGTERM to child and waiting...");
-            // Standard proxy behavior: if the client closes stdin, the proxy is done.
-            // We should kill/terminate the child so it doesn't hang indefinitely.
+            info!("Stdin closed, killing child process...");
             let _ = child.kill().await;
             let _ = child.wait().await;
+            0
         }
-    }
+    };
 
     // Capture metrics immediately after child exit
     let session_duration = metrics.start_time.elapsed();
@@ -260,11 +271,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
     info!("Errors: {}", metrics.errors.load(Ordering::Relaxed));
 
-    // Wait briefly for remaining stdout/stderr logs
-    let _ = tokio::time::timeout(Duration::from_millis(200), async {
-        let _ = tokio::join!(stdout_task, stderr_task);
-    }).await;
+    info!("Proxy exiting with code {}", exit_code);
 
-    info!("Proxy exiting");
-    Ok(())
+    std::process::exit(exit_code);
 }
