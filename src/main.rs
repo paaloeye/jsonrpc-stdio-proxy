@@ -163,18 +163,50 @@ where
 }
 
 #[derive(Parser, Debug)]
-#[command(author, version, about, long_about = None)]
+#[command(
+    name = "jsonrpc-stdio-proxy",
+    version,
+    about = "Transparent JSON-RPC stdio proxy with native OSLog tracing and performance metrics",
+    long_about = r#"
+A lightweight, zero-configuration proxy that sits between a JSON-RPC client
+(e.g. Claude Code, VS Code) and a JSON-RPC server (e.g. an MCP tool, Language Server, or DAP server).
+
+It transparently forwards stdio streams while observing and logging JSON payloads directly
+into Apple's Unified Logging System (OSLog), avoiding stdout pollution while providing full
+observability and RTT latency metrics.
+
+Supported framing:
+ - Newline-Delimited (MCP)
+ - Header-Delimited (LSP/DAP with Content-Length)
+        "#,
+    after_help = r#"
+EXAMPLES:
+
+# Proxy an MCP server with a custom subsystem identifier
+jsonrpc-stdio-proxy --subsystem com.example.mcp -- npx -y @modelcontextprotocol/server-memory
+
+# Proxy a Language Server Protocol (LSP) server
+jsonrpc-stdio-proxy -- rust-analyzer
+
+# Stream proxy logs in real time on macOS
+log stream --predicate 'subsystem == "com.example.mcp"' --debug --info
+
+# Show past session logs:
+log show --predicate 'subsystem == "com.example.mcp"' --debug --info --last 1h
+    "#
+)]
+
 struct Args {
-    /// OSLog subsystem
-    #[arg(short, long, default_value = "com.paaloeye.jsonrpc-proxy")]
+    /// macOS OSLog subsystem identifier for log filtering
+    #[arg(short, long, default_value = "com.paaloeye.jsonrpc-proxy", value_name = "SUBSYSTEM")]
     subsystem: String,
 
-    /// OSLog category
-    #[arg(short, long, default_value = "default")]
+    /// macOS OSLog category identifier
+    #[arg(short, long, default_value = "default", value_name = "CATEGORY")]
     category: String,
 
-    /// The command and arguments to run
-    #[arg(last = true, required = true)]
+    /// Target command and arguments to execute and proxy (must follow '--')
+    #[arg(last = true, required = true, value_name = "COMMAND")]
     command: Vec<String>,
 }
 

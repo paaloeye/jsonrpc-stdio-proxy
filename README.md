@@ -1,47 +1,77 @@
 # JSON-RPC Stdio Proxy
 
-A lightweight, zero-configuration proxy that sits between a JSON-RPC client (like Claude Code, VS Code, or Cursor) and a JSON-RPC server (like an MCP tool or Language Server).
+A lightweight, zero-configuration proxy that sits between JSON-RPC clients (e.g Claude Code, VS Code) and
+JSON-RPC servers (e.g., [MCP](https://modelcontextprotocol.io/specification/2026-07-28), [LSP](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/),
+or [DAP](https://microsoft.github.io/debug-adapter-protocol//specification.html)).
 
-It transparently forwards `stdio` traffic while observing, measuring, and logging the JSON payloads directly into **Apple's Unified Logging System (OSLog)**.
-This prevents log pollution on `stdout` (which would break the protocol) while providing complete observability into the process.
+It transparently forwards `stdio` streams while observing, measuring, and logging JSON payloads directly into **Apple's Unified Logging System (OSLog)**.
+This prevents log pollution on `stdout` (which would break the protocol) while providing complete observability and round-trip latency metrics into the process.
 
 ## Features
 
-- [x] **Universal Framing**: Automatically detects and parses both Newline-Delimited (MCP) and Header-Delimited (LSP/DAP) JSON-RPC streams.
-- [x] **Native Observability**: Logs all requests and responses directly to the macOS `OSLog` framework.
-- [x] **Performance Metrics**: Tracks session duration, byte counts, message counts, and calculates Request/Response Round-Trip Time (RTT).
+- [x] **Universal Framing**: Automatically detects and parses both Newline-Delimited (MCP) and Header-Delimited (LSP/DAP with `Content-Length`) JSON-RPC streams.
+- [x] **Native Observability**: Logs all requests and responses directly to Apple Unified Logging (`OSLog`).
+- [x] **Performance Metrics**: Tracks session duration, byte counts, message counts, and calculates Request/Response Round-Trip Time (RTT latency: min/max/avg).
 - [x] **Single Binary**: Compiles to a small, statically-linked executable (via Rust/Tokio) with zero external runtime dependencies.
-- [x] **Aggressive Cleanup**: Correctly mirrors EOF and signals to prevent zombie processes.
+- [x] **Aggressive Cleanup**: Correctly mirrors EOF and signals (`SIGINT`/Ctrl-C) to child processes to prevent zombie processes.
 
 ## Installation / Building
 
 ```sh
+# Build debug binary
+cargo build
+
+# Build release binary
 cargo build --release
 # The binary will be available at target/release/jsonrpc-stdio-proxy
 ```
 
-## Usage
+## CLI Usage
 
-You can use the proxy anywhere you normally invoke a CLI tool. Simply prefix your command with `jsonrpc-stdio-proxy --`.
+```text
+Usage: jsonrpc-stdio-proxy [OPTIONS] -- <COMMAND>...
 
-### `.mcp.json` Example
+Arguments:
+  <COMMAND>...  Target command and arguments to execute and proxy (must follow '--')
 
-Configure an MCP client to use the proxy and specify a custom OSLog subsystem for filtering:
+Options:
+  -s, --subsystem <SUBSYSTEM>  macOS OSLog subsystem identifier for log filtering [default: com.paaloeye.jsonrpc-proxy]
+  -c, --category <CATEGORY>    macOS OSLog category identifier [default: default]
+  -h, --help                   Print help (see a summary with '-h')
+  -V, --version                Print version
+```
+
+## Examples
+
+### Command Line
+
+```sh
+# Proxy an MCP server with a custom subsystem identifier
+jsonrpc-stdio-proxy --subsystem com.example.mcp -- npx -y @modelcontextprotocol/server-memory
+
+# Proxy a Language Server Protocol (LSP) server
+jsonrpc-stdio-proxy -- rust-analyzer
+```
+
+### MCP Client Configuration (`.mcp.json` / Claude Desktop)
+
+Configure an MCP client to wrap any server command with the proxy:
 
 ```json
 {
-    "mcpServers": {
-        "flight-engineer": {
-            "command": "target/release/jsonrpc-stdio-proxy",
-            "args": [
-                "--subsystem",
-                "com.paaloeye.flight.engineer",
-                "--",
-                "ferun",
-                "mcpbridge"
-            ]
-        }
+  "mcpServers": {
+    "memory": {
+      "command": "target/release/jsonrpc-stdio-proxy",
+      "args": [
+        "--subsystem",
+        "com.example.mcp.memory",
+        "--",
+        "npx",
+        "-y",
+        "@modelcontextprotocol/server-memory"
+      ]
     }
+  }
 }
 ```
 
@@ -50,16 +80,19 @@ Configure an MCP client to use the proxy and specify a custom OSLog subsystem fo
 Because the proxy uses Apple's Unified Logging, you can view the traffic in real-time using the `log` CLI tool or the native `Console.app`.
 
 ```sh
-# Stream logs in real-time
-log stream --predicate 'subsystem == "com.paaloeye.flight.engineer"' --debug --info
+# Stream proxy logs in real time on macOS
+log stream --predicate 'subsystem == "com.paaloeye.jsonrpc-proxy"' --debug --info
 
-# View past logs
-log show --predicate 'subsystem == "com.paaloeye.flight.engineer"' --debug --info --last 1h
+# Filter by custom subsystem
+log stream --predicate 'subsystem == "com.example.mcp.memory"' --debug --info
+
+# Show past session logs
+log show --predicate 'subsystem == "com.paaloeye.jsonrpc-proxy"' --debug --info --last 1h
 ```
 
 ## Metrics Output
 
-When the proxy shuts down, it automatically dumps a performance summary to OSLog:
+When the proxy shuts down, it automatically logs a performance summary to OSLog:
 
 ```text
 --- Performance Metrics Summary ---
@@ -73,5 +106,6 @@ Errors: 0
 ## References
 
 - [tokio](https://tokio.rs/)
+- [clap](https://docs.rs/clap)
 - [dashmap crate](https://github.com/xacrimon/dashmap)
-- [Apple OS tracing crate](https://github.com/Absolucy/tracing-oslog)
+- [oslog crate](https://docs.rs/oslog)
