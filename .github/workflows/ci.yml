@@ -27,6 +27,8 @@ jobs:
 
       - name: Setup Rust cache
         uses: Swatinem/rust-cache@v2
+
+      - name: Check code formatting
         run: cargo fmt --check
 
       - name: Run clippy linter
