@@ -1,12 +1,12 @@
+use std::process::Stdio;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::process::Command;
-use std::process::Stdio;
 
 #[tokio::test]
 async fn test_mcp_style_ndjson() {
     // Spawn proxy with 'cat' to echo back everything
     let mut child = Command::new("cargo")
-        .args(&["run", "--", "--", "cat"])
+        .args(["run", "--", "--", "cat"])
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .spawn()
@@ -30,7 +30,7 @@ async fn test_mcp_style_ndjson() {
 #[tokio::test]
 async fn test_lsp_style_header_delimited() {
     let mut child = Command::new("cargo")
-        .args(&["run", "--", "--", "cat"])
+        .args(["run", "--", "--", "cat"])
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .spawn()
@@ -58,7 +58,7 @@ async fn test_lsp_style_header_delimited() {
 #[tokio::test]
 async fn test_multiple_messages_mixed() {
     let mut child = Command::new("cargo")
-        .args(&["run", "--", "--", "cat"])
+        .args(["run", "--", "--", "cat"])
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .spawn()
@@ -70,7 +70,7 @@ async fn test_multiple_messages_mixed() {
     // 1. Send MCP message
     let mcp_msg = b"{\"id\": 1, \"method\": \"mcp-1\"}\n";
     stdin.write_all(mcp_msg).await.unwrap();
-    
+
     // 2. Send LSP message
     let lsp_json = b"{\"id\": 2, \"method\": \"lsp-2\"}";
     let lsp_headers = format!("Content-Length: {}\r\n\r\n", lsp_json.len());

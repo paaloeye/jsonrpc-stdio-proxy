@@ -22,8 +22,8 @@ This prevents log pollution on `stdout` (which would break the protocol) while p
 cargo build
 
 # Build release binary
-cargo build --release
-# The binary will be available at target/release/jsonrpc-stdio-proxy
+cargo install --path .
+# The binary will be available at ~/.cargo/bin/jsonrpc-stdio-proxy
 ```
 
 ## CLI Usage

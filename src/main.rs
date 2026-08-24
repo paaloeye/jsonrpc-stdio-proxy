@@ -4,11 +4,13 @@ use log::{debug, error, info};
 use oslog::OsLogger;
 use serde_json::Value;
 use std::process::Stdio;
-use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use std::sync::Mutex;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{Duration, Instant};
-use tokio::io::{self, AsyncBufReadExt, AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt, BufReader};
+use tokio::io::{
+    self, AsyncBufReadExt, AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt, BufReader,
+};
 use tokio::process::Command;
 use tokio::signal;
 
@@ -93,10 +95,14 @@ where
             loop {
                 header_buf.clear();
                 let n = buf_reader.read_line(&mut header_buf).await?;
-                if n == 0 { break; }
+                if n == 0 {
+                    break;
+                }
                 bytes_acc += n;
                 writer.write_all(header_buf.as_bytes()).await?;
-                if header_buf == "\r\n" || header_buf == "\n" { break; }
+                if header_buf == "\r\n" || header_buf == "\n" {
+                    break;
+                }
             }
 
             let mut payload = vec![0u8; content_length];
@@ -108,7 +114,6 @@ where
 
             current_message_bytes = bytes_acc;
             payload_to_log = Some(payload);
-
         } else {
             // --- Newline-Delimited (MCP) ---
             current_message_bytes = bytes_read;
@@ -129,20 +134,21 @@ where
                 info!("[{}] {}", direction_tag, trimmed_payload);
 
                 // Latency tracking
-                if let Ok(json) = serde_json::from_str::<Value>(trimmed_payload) {
-                    if let Some(id_val) = json.get("id") {
-                        let id = id_val.to_string();
-                        if is_client_to_server {
-                            if json.get("method").is_some() && json.get("result").is_none() && json.get("error").is_none() {
-                                metrics.pending_requests.insert(id, Instant::now());
-                            }
-                        } else {
-                            if json.get("result").is_some() || json.get("error").is_some() {
-                                if let Some((_, start)) = metrics.pending_requests.remove(&id) {
-                                    metrics.latencies.insert(start.elapsed());
-                                }
-                            }
+                if let Ok(json) = serde_json::from_str::<Value>(trimmed_payload)
+                    && let Some(id_val) = json.get("id")
+                {
+                    let id = id_val.to_string();
+                    if is_client_to_server {
+                        if json.get("method").is_some()
+                            && json.get("result").is_none()
+                            && json.get("error").is_none()
+                        {
+                            metrics.pending_requests.insert(id, Instant::now());
                         }
+                    } else if (json.get("result").is_some() || json.get("error").is_some())
+                        && let Some((_, start)) = metrics.pending_requests.remove(&id)
+                    {
+                        metrics.latencies.insert(start.elapsed());
                     }
                 }
             } else {
@@ -151,11 +157,19 @@ where
 
             // Update Global Metrics
             if is_client_to_server {
-                metrics.client_to_server_messages.fetch_add(1, Ordering::Relaxed);
-                metrics.client_to_server_bytes.fetch_add(current_message_bytes as u64, Ordering::Relaxed);
+                metrics
+                    .client_to_server_messages
+                    .fetch_add(1, Ordering::Relaxed);
+                metrics
+                    .client_to_server_bytes
+                    .fetch_add(current_message_bytes as u64, Ordering::Relaxed);
             } else {
-                metrics.server_to_client_messages.fetch_add(1, Ordering::Relaxed);
-                metrics.server_to_client_bytes.fetch_add(current_message_bytes as u64, Ordering::Relaxed);
+                metrics
+                    .server_to_client_messages
+                    .fetch_add(1, Ordering::Relaxed);
+                metrics
+                    .server_to_client_bytes
+                    .fetch_add(current_message_bytes as u64, Ordering::Relaxed);
             }
         }
     }
@@ -195,10 +209,14 @@ log stream --predicate 'subsystem == "com.example.mcp"' --debug --info
 log show --predicate 'subsystem == "com.example.mcp"' --debug --info --last 1h
     "#
 )]
-
 struct Args {
     /// macOS OSLog subsystem identifier for log filtering
-    #[arg(short, long, default_value = "com.paaloeye.jsonrpc-proxy", value_name = "SUBSYSTEM")]
+    #[arg(
+        short,
+        long,
+        default_value = "com.paaloeye.jsonrpc-proxy",
+        value_name = "SUBSYSTEM"
+    )]
     subsystem: String,
 
     /// macOS OSLog category identifier
@@ -292,12 +310,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     info!("--- Performance Metrics Summary ---");
     info!("Session Duration: {:?}", session_duration);
-    info!("Client -> Server: {} msgs, {} bytes",
+    info!(
+        "Client -> Server: {} msgs, {} bytes",
         metrics.client_to_server_messages.load(Ordering::Relaxed),
-        metrics.client_to_server_bytes.load(Ordering::Relaxed));
-    info!("Server -> Client: {} msgs, {} bytes",
+        metrics.client_to_server_bytes.load(Ordering::Relaxed)
+    );
+    info!(
+        "Server -> Client: {} msgs, {} bytes",
         metrics.server_to_client_messages.load(Ordering::Relaxed),
-        metrics.server_to_client_bytes.load(Ordering::Relaxed));
+        metrics.server_to_client_bytes.load(Ordering::Relaxed)
+    );
 
     if !latencies.is_empty() {
         let min = latencies.iter().min().unwrap();
@@ -310,7 +332,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     if exit_code != 0 {
         let lines = stderr_lines.lock().unwrap();
         if !lines.is_empty() {
-            eprintln!("jsonrpc-stdio-proxy: child process failed (exit code {})", exit_code);
+            eprintln!(
+                "jsonrpc-stdio-proxy: child process failed (exit code {})",
+                exit_code
+            );
             for line in lines.iter() {
                 eprintln!("  {}", line);
             }

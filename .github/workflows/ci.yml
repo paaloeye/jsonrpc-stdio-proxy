@@ -1,0 +1,70 @@
+# Continuous Integration recipes
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  test:
+    name: Test & Lint
+    runs-on: macos-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Setup Rust cache
+        uses: Swatinem/rust-cache@v2
+        run: cargo fmt --check
+
+      - name: Run clippy linter
+        run: cargo clippy --all-targets --all-features -- -D warnings
+
+      - name: Run tests
+        run: cargo test --verbose
+
+  build:
+    name: Build Release
+    runs-on: macos-latest
+    timeout-minutes: 10
+    needs: test
+    if: github.event_name != 'pull_request'
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Setup Rust cache
+        uses: Swatinem/rust-cache@v2
+
+      - name: Build release
+        run: cargo build --release --verbose
+
+      - name: Smoke test
+        run: |
+          ./target/release/jsonrpc-stdio-proxy --version
+          ./target/release/jsonrpc-stdio-proxy --help
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: jsonrpc-stdio-proxy-macos-${{ github.sha }}
+          path: target/release/jsonrpc-stdio-proxy
+          retention-days: 30
+          if-no-files-found: error
+
