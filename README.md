@@ -1,10 +1,18 @@
 # JSON-RPC Stdio Proxy
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/screenshot_dark.png">
+  <source media="(prefers-color-scheme: light)" srcset="docs/screenshots/screenshot_light.png">
+  <img alt="jsonrpc-stdio-proxy" src="docs/screenshots/screenshot_dark.png">
+</picture>
+
 A lightweight, zero-configuration proxy that sits between JSON-RPC clients (e.g Claude Code, VS Code) and
 JSON-RPC servers (e.g. [MCP](https://modelcontextprotocol.io/specification/2026-07-28), [LSP](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/),
 or [DAP](https://microsoft.github.io/debug-adapter-protocol//specification.html)).
 
 It transparently forwards `stdio` streams while observing, measuring, and logging JSON payloads directly into **AppleUnified Logging (OSLog)**.
+
+---
 
 ## Features
 
@@ -13,6 +21,8 @@ It transparently forwards `stdio` streams while observing, measuring, and loggin
 - [x] **Performance Metrics**: Tracks session duration, byte counts, message counts, and calculates Request/Response Round-Trip Time (RTT latency: min/max/avg).
 - [x] **Single Binary**: Compiles to a small, statically-linked executable (via Rust/Tokio) with zero external runtime dependencies.
 - [x] **Aggressive Cleanup**: Correctly mirrors EOF and signals (`SIGINT`/Ctrl-C) to child processes to prevent zombie processes.
+
+---
 
 ## Installation / Building
 
@@ -24,6 +34,8 @@ cargo build
 cargo install --path .
 # The binary will be available at ~/.cargo/bin/jsonrpc-stdio-proxy
 ```
+
+---
 
 ## Usage
 
@@ -50,6 +62,8 @@ jsonrpc-stdio-proxy --subsystem com.example.mcp -- bunx -y mongodb-mcp-server@la
 jsonrpc-stdio-proxy -- rust-analyzer
 ```
 
+---
+
 ### MCP Client Configuration (`.mcp.json` / Claude Desktop)
 
 Configure an MCP client to wrap any server command with the proxy:
@@ -72,6 +86,8 @@ Configure an MCP client to wrap any server command with the proxy:
 }
 ```
 
+---
+
 ## Viewing Logs
 
 Because the proxy uses Apple Unified Logging, you can view the traffic in real-time using the `log` CLI tool or the native `Console.app`.
@@ -87,6 +103,8 @@ log stream --predicate 'subsystem == "com.example.mcp.memory"' --debug --info
 log show --predicate 'subsystem == "com.paaloeye.jsonrpc-proxy"' --debug --info --last 1h
 ```
 
+---
+
 ## Metrics Output
 
 When the proxy shuts down, it automatically logs a performance summary to OSLog:
@@ -99,6 +117,8 @@ Server -> Client: 14 msgs, 45120 bytes
 RTT Latency: Min 1.2ms, Max 45.1ms, Avg 12.4ms
 Errors: 0
 ```
+
+---
 
 ## Development & Contributing
 
@@ -118,6 +138,8 @@ nu scripts/test.nu
 nu scripts/build.nu
 ```
 
+---
+
 ## References
 
 - [tokio](https://tokio.rs/)
@@ -127,5 +149,13 @@ nu scripts/build.nu
 
 ---
 
-> [!CAUTION]
-> This file was compiled and written with AI assistance (Antigravity).
+## Author
+
+If you have any questions — ask me on [x.com/paaloeye](https://x.com/paaloeye), open an [Issue](https://github.com/paaloeye/jsonrpc-stdio-proxy/issues/new),
+or file a [PR](https://github.com/paaloeye/jsonrpc-stdio-proxy/compare).
+
+---
+
+## Licence
+
+MIT — see [LICENCE](./LICENCE).

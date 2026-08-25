@@ -30,8 +30,3 @@ Brief description of what this PR does and why.
 - [ ] My code follows the project's style guidelines (British English comments/docs)
 - [ ] I have updated documentation (`README.md`, `GOTCHA.md`, `CONTRIBUTING.md`, etc.) where relevant
 - [ ] I have verified process lifecycle (clean child termination on stdin EOF and signals)
-
----
-
-> [!CAUTION]
-> This file was compiled and written with AI assistance (Antigravity).

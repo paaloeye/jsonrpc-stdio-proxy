@@ -114,18 +114,28 @@ jobs:
         run: |
           API_KEY_PATH="${RUNNER_TEMP}/private_keys/AuthKey_${ASC_API_KEY_ID}.p8"
           ZIP_FILE=".dist/${ARCHIVE_BASE}.zip"
+          NOTARIZE_AUTH_ARGS=(--key "${API_KEY_PATH}" --key-id "${ASC_API_KEY_ID}" --issuer "${ASC_API_ISSUER}")
 
           echo "Submitting ${ZIP_FILE} for notarization..."
-          SUBMIT_OUTPUT=$(xcrun notarytool submit "${ZIP_FILE}" \
-            --key "${API_KEY_PATH}" \
-            --key-id "${ASC_API_KEY_ID}" \
-            --issuer "${ASC_API_ISSUER}" \
-            --wait 2>&1)
+          SUBMIT_OUTPUT=$(xcrun notarytool submit "${ZIP_FILE}" "${NOTARIZE_AUTH_ARGS[@]}" 2>&1) || true
           echo "${SUBMIT_OUTPUT}"
 
-          STATUS=$(echo "${SUBMIT_OUTPUT}" | grep -E "status:\s+Accepted" || true)
-          if [ -z "${STATUS}" ]; then
-            echo "::error::Notarization failed!"
+          SUBMISSION_ID=$(echo "${SUBMIT_OUTPUT}" | grep -E "\s+id:" | head -n 1 | awk '{print $2}')
+          if [ -z "${SUBMISSION_ID}" ]; then
+            echo "::error::Failed to obtain submission ID from notarytool submit"
+            exit 1
+          fi
+
+          echo "Submission ID: ${SUBMISSION_ID}"
+          echo "Waiting for Apple notarization service..."
+          WAIT_OUTPUT=$(xcrun notarytool wait "${SUBMISSION_ID}" "${NOTARIZE_AUTH_ARGS[@]}" 2>&1) || true
+          echo "${WAIT_OUTPUT}"
+
+          NOTARIZE_STATUS=$(echo "${WAIT_OUTPUT}" | grep -E "\s+status:" | head -n 1 | awk '{print $2}')
+          if [ "${NOTARIZE_STATUS}" != "Accepted" ]; then
+            echo "::error::Notarization failed with status: ${NOTARIZE_STATUS}"
+            echo "Fetching notarization logs for submission ${SUBMISSION_ID}..."
+            xcrun notarytool log "${SUBMISSION_ID}" "${NOTARIZE_AUTH_ARGS[@]}" 2>&1 || true
             exit 1
           fi
           echo "Notarization accepted."
