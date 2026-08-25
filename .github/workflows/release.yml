@@ -120,7 +120,7 @@ jobs:
           SUBMIT_OUTPUT=$(xcrun notarytool submit "${ZIP_FILE}" "${NOTARIZE_AUTH_ARGS[@]}" 2>&1) || true
           echo "${SUBMIT_OUTPUT}"
 
-          SUBMISSION_ID=$(echo "${SUBMIT_OUTPUT}" | grep -E "\s+id:" | head -n 1 | awk '{print $2}')
+          SUBMISSION_ID=$(echo "${SUBMIT_OUTPUT}" | awk '/^[[:space:]]*id:[[:space:]]*/ { print $2; exit }')
           if [ -z "${SUBMISSION_ID}" ]; then
             echo "::error::Failed to obtain submission ID from notarytool submit"
             exit 1
@@ -131,7 +131,7 @@ jobs:
           WAIT_OUTPUT=$(xcrun notarytool wait "${SUBMISSION_ID}" "${NOTARIZE_AUTH_ARGS[@]}" 2>&1) || true
           echo "${WAIT_OUTPUT}"
 
-          NOTARIZE_STATUS=$(echo "${WAIT_OUTPUT}" | grep -E "\s+status:" | head -n 1 | awk '{print $2}')
+          NOTARIZE_STATUS=$(echo "${WAIT_OUTPUT}" | awk '/^[[:space:]]*status:[[:space:]]*/ { print $2; exit }')
           if [ "${NOTARIZE_STATUS}" != "Accepted" ]; then
             echo "::error::Notarization failed with status: ${NOTARIZE_STATUS}"
             echo "Fetching notarization logs for submission ${SUBMISSION_ID}..."

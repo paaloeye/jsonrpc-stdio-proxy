@@ -10,7 +10,7 @@ A lightweight, zero-configuration proxy that sits between JSON-RPC clients (e.g 
 JSON-RPC servers (e.g. [MCP](https://modelcontextprotocol.io/specification/2026-07-28), [LSP](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/),
 or [DAP](https://microsoft.github.io/debug-adapter-protocol//specification.html)).
 
-It transparently forwards `stdio` streams while observing, measuring, and logging JSON payloads directly into **AppleUnified Logging (OSLog)**.
+It transparently forwards `stdio` streams while observing, measuring, and logging JSON payloads directly into **Apple Unified Logging (OSLog)**.
 
 ---
 
