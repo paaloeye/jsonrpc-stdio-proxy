@@ -1,9 +1,9 @@
 # JSON-RPC Stdio Proxy
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/screenshot_dark.png">
-  <source media="(prefers-color-scheme: light)" srcset="docs/screenshots/screenshot_light.png">
-  <img alt="jsonrpc-stdio-proxy" src="docs/screenshots/screenshot_dark.png">
+  <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/screenshot_dark@2x.png">
+  <source media="(prefers-color-scheme: light)" srcset="docs/screenshots/screenshot_light@2x.png">
+  <img alt="jsonrpc-stdio-proxy" src="docs/screenshots/screenshot_dark@2x.png">
 </picture>
 
 A lightweight, zero-configuration proxy that sits between JSON-RPC clients (e.g Claude Code, VS Code) and
