@@ -1,63 +1,95 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance to Claude when working in this repository.
 
-## Build & Run
+> [!WARNING]
+> These rules override default behaviour. Follow them exactly when working with this codebase. Violations may cause
+> linter failures or break pre-commit hooks.
 
-```sh
-# Debug build
-cargo build
+## Project Overview
 
-# Release build (required for use in .mcp.json)
-cargo build --release
+`jsonrpc-stdio-proxy` is a single-binary transparent proxy for JSON-RPC communication over standard input/output (stdio).
+It supports both Newline-Delimited (MCP) and Header-Delimited (LSP/DAP) framing.
 
-# Run directly (proxies a command via stdio)
-cargo run -- -- <command> [args...]
-```
+## IMPORTANT
 
-## Testing
+- ALWAYS read [GOTCHA.md](./GOTCHA.md) first
+- ALWAYS read `CLAUDE.*.fragment.md` first
+- PREFER British English over American English spelling and grammar except in **inline code** sections
+- USE Markdown banners ([see below](#a-tour-of-banners))
+- Files and Directories MUST NOT have **dashes** in names/paths (use **underscore** instead)
+- NEVER use Git LFS
+- USE Emoji in [README.md](./README.md) or **docs/\*.md** with care. NOT MUCH.
+- ALL development scripts use Nushell (\*.nu) - install nushell for development workflow
+- ALWAYS use `[x]` or `[ ]` instead of ✅ / 🔲 / for checkmarks
+- NEVER use `[x]` or `[ ]` in Markdown tables; USE ✅ / 🔲 / instead. **Reason**: it's not supported
+- PREFER [GitHub Emoji API](https://api.github.com/emojis) over Unicode Emoji
+- ALWAYS add footer to new Markdown files with a AI generated content banner (!CAUTION)
+- PREFER 120 characters per line
 
-```sh
-# Run all tests
-cargo test
+## A Tour of Banners
 
-# Run a single test
-cargo test test_mcp_style_ndjson
+> [!NOTE]
+> Highlights information that users should take into account, even when skimming.
 
-# Integration tests spawn the proxy via `cargo run` with `cat` as the child process
-```
+> [!TIP]
+> Optional information to help a user be more successful.
 
-## Linting & Formatting
+> [!IMPORTANT]
+> Crucial information necessary for users to succeed.
 
-```sh
-cargo fmt
-cargo clippy
-```
+> [!WARNING]
+> Critical content demanding immediate user attention due to potential risks.
+
+> [!CAUTION]
+> Negative potential consequences of an action.
+
+## Conventions
+
+- **We're Dutch honest**
+- British English throughout (colour, licence, behaviour, etc.)
+- No dashes in file or directory names — use underscores
+- Follow conventional commit format (see workspace CLAUDE.md for the full format)
+
+> [!IMPORTANT]
+> Before every commit, re-read the commit format in workspace **CLAUDE.md**.
+> The footer **requires** shell-expanded `ai.nu` lines and an **unquoted** heredoc (`EOF`, not `'EOF'`):
 
 ## Architecture
 
-This is a single-file Rust binary (`src/main.rs`) built on Tokio. It spawns a child process and bidirectionally proxies `stdio` between the caller and the child, logging all JSON-RPC payloads to macOS `OSLog` (`oslog` crate) without polluting `stdout`.
+- **Language:** Rust (Edition 2024).
+- **Concurrency:** Uses `tokio` for asynchronous I/O and process management.
+- **Observability:** Relies heavily on Apple's Unified Logging (`oslog` crate) to keep stdout strictly reserved for JSON-RPC data.
+- **Metrics:** Uses `dashmap` and `std::sync::atomic` for zero-block concurrency metrics (latency, bytes, message counts).
 
-**Core flow:**
+## Rules & Conventions
 
-1. CLI args (via `clap`) capture `--subsystem`, `--category`, and the child command (`--` separator).
-2. `OsLogger` is initialised with the given subsystem so logs go to Apple Unified Logging, not `stdout`/`stderr`.
-3. Three async tasks run concurrently:
-   - `stdin_task` — reads proxy stdin, forwards to child stdin (Client → Server)
-   - `stdout_task` — reads child stdout, forwards to proxy stdout (Server → Client)
-   - `stderr_task` — reads child stderr, logs each line via `info!`
-4. A `tokio::select!` drives shutdown: child exit, Ctrl-C, or stdin EOF all cleanly kill the child.
-5. Metrics (`Arc<Metrics>`) are updated atomically in each direction and dumped to OSLog on exit.
+1. **Never Pollute Stdout:** The proxy's `stdout` must **only** contain valid JSON-RPC traffic.
+   All logs, warnings, errors, and debug information MUST be routed through the `log` crate (which outputs to OSLog via `oslog`).
 
-**Protocol detection** happens inside `proxy_and_log_stream`: if the first line starts with `Content-Length:`, the stream is treated as Header-Delimited (LSP/DAP); otherwise it is treated as Newline-Delimited (MCP/NDJSON). Both paths forward the full frame verbatim.
+2. **Process Lifecycle:**
+   - If the proxy's `stdin` closes (EOF), the proxy MUST immediately send `SIGTERM`/`kill` to the child process.
+   - The proxy MUST wait for the child to exit before terminating itself.
+   - Performance metrics MUST be logged during the shutdown sequence before exiting.
+   -
+3. **Dependencies:** Avoid adding external dependencies if the standard library or `tokio` can handle it natively.
+   If parsing JSON is required, use `serde_json`.
 
-**RTT tracking**: outbound requests (has `method`, has `id`, no `result`/`error`) are recorded in a `DashMap<id, Instant>`; matching inbound responses resolve the entry and store the elapsed `Duration` in a `DashSet`.
+## Build & Test Commands
+- **Build:** `cargo build`
+- **Release:** `cargo build --release`
+- **Test:** `cargo test`
+
+## Context Efficiency
+
+When modifying the streaming/parsing loop (`proxy_and_log_stream`), avoid making sweeping changes.
+Use targeted surgical replacements as the state machine managing bytes and buffers is delicate.
 
 ## Viewing Logs
 
 ```sh
-log stream --predicate 'subsystem == "com.paaloeye.flight.engineer"' --debug --info
-log show  --predicate 'subsystem == "com.paaloeye.flight.engineer"' --debug --info --last 1h
+log stream --predicate 'subsystem == "com.paaloeye.jsonrpc-proxy"' --debug --info
+log show  --predicate 'subsystem == "com.paaloeye.jsonrpc-proxy"' --debug --info --last 1h
 ```
 
 ## Key Constraints

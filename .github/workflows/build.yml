@@ -1,5 +1,4 @@
-# Continuous Integration recipes
-name: CI
+name: Build
 
 on:
   push:
