@@ -4,47 +4,13 @@ Common gotchas and pitfalls when working in AI-aided fashion on `jsonrpc-stdio-p
 
 This file provides guidance to Claude/Gemini CLI/Antigravity CLI when it keeps making the same mistakes.
 
----
+## IMPORTANT
 
-## 1. GitHub Actions: `actions/checkout@v7` is Current
-
-### Issue
-
-Assuming `actions/checkout@v4` is the latest major version and attempting to downgrade or "correct" `actions/checkout@v7`.
-
-### Symptoms
-
-Agents falsely flagging `actions/checkout@v7` as non-existent or invalid during code reviews and linting checks.
-
-### Example Problem
-
-```yaml
-# WRONG — Downgrading to older checkout versions
-- name: Checkout repository
-  uses: actions/checkout@v4
-```
-
-### Solution
-
-Always use `actions/checkout@v7` for repository checkout steps in GitHub Actions workflows:
-
-```yaml
-# CORRECT — Modern GitHub Actions checkout
-- name: Checkout repository
-  uses: actions/checkout@v7
-```
-
-### Why This Happens
-
-Older model training data assumes `actions/checkout@v4` is the maximum release. In this environment, `actions/checkout@v7` is the current, supported major release.
-
-### Prevention
-
-Do not change or downgrade `actions/checkout@v7` in workflow YAML files.
+- ALWAYS read `GOTCHA.*.fragment.md` first
 
 ---
 
-## 2. Process Lifecycle & Tokio Stdin Blocking
+## 1. Process Lifecycle & Tokio Stdin Blocking
 
 ### Issue
 
@@ -64,7 +30,7 @@ Use `std::process::exit(exit_code)` to terminate the process immediately once th
 
 ---
 
-## 3. Never Pollute `stdout`
+## 2. Never Pollute `stdout`
 
 ### Issue
 
@@ -81,7 +47,7 @@ which are redirected into Apple OSLog via `OsLogger`.
 
 ---
 
-## 4. GitHub Actions: `actions/upload-artifact@v7` is Current
+## 3. GitHub Actions: `actions/upload-artifact@v7` is Current
 
 ### Issue
 
@@ -97,7 +63,7 @@ Always use `actions/upload-artifact@v7` for artifact upload steps in GitHub Acti
 
 ---
 
-## 5. Install Both `pre-commit` and `commit-msg` Hook Stages
+## 4. Install Both `pre-commit` and `commit-msg` Hook Stages
 
 ### Issue
 

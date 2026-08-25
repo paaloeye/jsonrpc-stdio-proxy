@@ -78,6 +78,49 @@ In this environment, `actions/upload-artifact@v7` is the current, supported majo
 
 Do not change or downgrade `actions/upload-artifact@v7` in workflow YAML files.
 
+## GitHub Actions: `actions/upload-artifact` Ignores Hidden Folders (`.dist/`) by Default
+
+### Issue
+
+Uploading artifacts located in dot-prefixed directories (e.g. `.dist/*`)
+fails with `No files were found with the provided path: .dist/*. No artifacts will be uploaded.`
+
+### Symptoms
+
+Artifact upload step fails immediately in CI even when preceding steps successfully generated files in `.dist/`.
+
+### Example Problem
+
+```yaml
+# WRONG — .dist is treated as a hidden folder and ignored by default
+- name: Upload dist artifacts
+  uses: actions/upload-artifact@v7
+  with:
+    path: .dist/*
+```
+
+### Solution
+
+Explicitly set `include-hidden-files: true` when targeting dot-prefixed paths:
+
+```yaml
+# CORRECT — Allows globbing inside hidden folders like .dist
+- name: Upload dist artifacts
+  uses: actions/upload-artifact@v7
+  with:
+    path: .dist/*
+    include-hidden-files: true
+    archive: false
+```
+
+### Why This Happens
+
+`actions/upload-artifact` sets `include-hidden-files: false` by default, skipping all dot directories during file discovery.
+
+### Prevention
+
+Always set `include-hidden-files: true` when artifact directories begin with a dot (`.dist/`).
+
 ---
 
 > [!CAUTION]
