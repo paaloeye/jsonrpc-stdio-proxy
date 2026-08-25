@@ -107,10 +107,10 @@ jobs:
           echo "ARCHIVE_BASE=${ARCHIVE_BASE}" >> $GITHUB_ENV
 
       - name: Notarize release archive
-        if: env.ASC_API_KEY_ID != '' && env.ASC_ISSUER != ''
+        if: env.ASC_API_KEY_ID != '' && env.ASC_API_ISSUER != ''
         env:
           ASC_API_KEY_ID: ${{ vars.ASC_API_KEY_ID }}
-          ASC_ISSUER: ${{ vars.ASC_ISSUER }}
+          ASC_ISSUER: ${{ vars.ASC_API_ISSUER }}
         run: |
           API_KEY_PATH="${RUNNER_TEMP}/private_keys/AuthKey_${ASC_API_KEY_ID}.p8"
           ZIP_FILE=".dist/${ARCHIVE_BASE}.zip"
@@ -193,8 +193,8 @@ jobs:
             Compiled and signed for both Apple Silicon (`arm64`) and Intel (`x86_64`) macOS.
 
             ### Checksums
-            \`\`\`
+            ```
             ${{ steps.artifacts_info.outputs.checksums }}
-            \`\`\`
+            ```
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
