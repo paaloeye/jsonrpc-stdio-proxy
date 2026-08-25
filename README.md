@@ -102,6 +102,24 @@ RTT Latency: Min 1.2ms, Max 45.1ms, Avg 12.4ms
 Errors: 0
 ```
 
+## Development & Contributing
+
+Please see [CONTRIBUTING.md](./CONTRIBUTING.md) for full setup instructions and contribution guidelines.
+
+```sh
+# Setup pre-commit hooks (pre-commit and commit-msg stages)
+pre-commit install --install-hooks -t pre-commit -t commit-msg
+
+# Run pre-commit checks across all files
+pre-commit run --all-files
+
+# Run tests and lints via Nushell
+nu scripts/test.nu
+
+# Build release binary
+nu scripts/build.nu
+```
+
 ## References
 
 - [tokio](https://tokio.rs/)

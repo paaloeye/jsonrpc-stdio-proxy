@@ -1,14 +1,14 @@
 {
-    "mcpServers": {
-        "flight-engineer": {
-            "command": "target/release/jsonrpc-stdio-proxy",
-            "args": [
-            	"--subsystem",
-            	"com.paaloeye.flight.engineer",
-            	"--",
-            	"/usr/local/bin/ferun",
-            	"mcpbridge"
-            ]
-        }
+  "mcpServers": {
+    "flight-engineer": {
+      "command": "target/release/jsonrpc-stdio-proxy",
+      "args": [
+        "--subsystem",
+        "com.paaloeye.flight.engineer",
+        "--",
+        "/usr/local/bin/ferun",
+        "mcpbridge"
+      ]
     }
+  }
 }

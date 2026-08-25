@@ -49,4 +49,3 @@ Suggested text or improvement here
 - [ ] I have searched existing issues to ensure this is not a duplicate
 - [ ] I have clearly identified the documentation location
 - [ ] I have provided a specific suggestion for improvement
-

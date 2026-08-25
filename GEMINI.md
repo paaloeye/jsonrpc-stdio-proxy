@@ -76,9 +76,12 @@ It supports both Newline-Delimited (MCP) and Header-Delimited (LSP/DAP) framing.
    If parsing JSON is required, use `serde_json`.
 
 ## Build & Test Commands
-- **Build:** `cargo build`
-- **Release:** `cargo build --release`
-- **Test:** `cargo test`
+
+- **Pre-commit Setup:** `pre-commit install`
+- **Pre-commit Run:** `pre-commit run --all-files`
+- **Test Suite & Lint:** `nu scripts/test.nu` (or `cargo test`)
+- **Build Release:** `nu scripts/build.nu` (or `cargo build --release`)
+- **Build & Sign (ad-hoc):** `nu scripts/build.nu --sign`
 
 ## Context Efficiency
 
@@ -97,6 +100,3 @@ log show  --predicate 'subsystem == "com.paaloeye.jsonrpc-proxy"' --debug --info
 - macOS only — depends on Apple `OSLog` via the `oslog` crate.
 - The release binary must exist at `target/release/jsonrpc-stdio-proxy` before entries in `.mcp.json` work.
 - `stdout` must never receive anything other than the proxied JSON-RPC stream; all diagnostics go through `log!` macros → OSLog.
-
-
-

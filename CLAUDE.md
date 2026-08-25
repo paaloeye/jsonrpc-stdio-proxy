@@ -76,9 +76,12 @@ It supports both Newline-Delimited (MCP) and Header-Delimited (LSP/DAP) framing.
    If parsing JSON is required, use `serde_json`.
 
 ## Build & Test Commands
-- **Build:** `cargo build`
-- **Release:** `cargo build --release`
-- **Test:** `cargo test`
+
+- **Pre-commit Setup:** `pre-commit install --install-hooks -t pre-commit -t commit-msg`
+- **Pre-commit Run:** `pre-commit run --all-files`
+- **Test Suite & Lint:** `nu scripts/test.nu` (or `cargo test`)
+- **Build Release:** `nu scripts/build.nu` (or `cargo build --release`)
+- **Build & Sign (ad-hoc):** `nu scripts/build.nu --sign`
 
 ## Context Efficiency
 

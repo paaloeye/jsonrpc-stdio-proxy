@@ -1,0 +1,12 @@
+{
+  "IgnoreDefaults": true,
+  "Disable": {
+    "IndentSize": true
+  },
+  "Exclude": [
+    "bun\\.lockb$",
+    "yarn\\.lock$",
+    "package-lock\\.json$",
+    "Cargo\\.lock$"
+  ]
+}

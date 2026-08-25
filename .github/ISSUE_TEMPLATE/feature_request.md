@@ -41,4 +41,3 @@ Add any other context, CLI flag proposals, or architecture notes here.
 - [ ] I have searched existing issues to ensure this is not a duplicate
 - [ ] I have clearly described the motivation and proposed solution
 - [ ] I have considered backward compatibility with JSON-RPC stdio clients
-

@@ -81,5 +81,42 @@ which are redirected into Apple OSLog via `OsLogger`.
 
 ---
 
+## 4. GitHub Actions: `actions/upload-artifact@v7` is Current
+
+### Issue
+
+Assuming `actions/upload-artifact@v4` is the latest major version and attempting to downgrade or "correct" `actions/upload-artifact@v7`.
+
+### Symptoms
+
+Agents falsely flagging `actions/upload-artifact@v7` as non-existent or replacing it with `@v4` in workflows.
+
+### Solution
+
+Always use `actions/upload-artifact@v7` for artifact upload steps in GitHub Actions workflows.
+
+---
+
+## 5. Install Both `pre-commit` and `commit-msg` Hook Stages
+
+### Issue
+
+Running `git commit` without installing hooks or only installing the default `pre-commit` hook stage causes broken commits or CI failures.
+
+### Symptoms
+
+- Conventional commit message header rules are bypassed locally but rejected in CI.
+- Markdown files fail formatting (`bun fmt:docs`) or lint checks in pull requests.
+
+### Solution
+
+Always install hooks for both stages upon cloning or setting up the workspace:
+
+```bash
+pre-commit install --install-hooks -t pre-commit -t commit-msg
+```
+
+---
+
 > [!CAUTION]
 > This file was compiled and written with AI assistance (Antigravity).

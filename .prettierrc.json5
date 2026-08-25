@@ -1,0 +1,16 @@
+//
+// Ref: https://prettier.io/docs/options#trailing-commas
+// Ref: https://prettier.io/docs/option-philosophy
+// Ref: https://prettier.io/blog/2024/01/12/3.2.0
+//
+{
+  overrides: [
+    // JSONC doesn't support trailing commas
+    {
+      files: "*.jsonc",
+      options: {
+        trailingComma: "none",
+      },
+    },
+  ],
+}

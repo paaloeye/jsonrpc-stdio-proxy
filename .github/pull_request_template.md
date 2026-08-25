@@ -25,7 +25,13 @@ Brief description of what this PR does and why.
 
 ## Checklist
 
+- [ ] I have installed pre-commit hooks (`pre-commit install --install-hooks -t pre-commit -t commit-msg`)
+- [ ] Pre-commit hooks pass on all staged changes (`pre-commit run --all-files`)
 - [ ] My code follows the project's style guidelines (British English comments/docs)
-- [ ] I have updated documentation (`README.md`, `GOTCHA.md`, etc.) where relevant
+- [ ] I have updated documentation (`README.md`, `GOTCHA.md`, `CONTRIBUTING.md`, etc.) where relevant
 - [ ] I have verified process lifecycle (clean child termination on stdin EOF and signals)
 
+---
+
+> [!CAUTION]
+> This file was compiled and written with AI assistance (Antigravity).

@@ -1,0 +1,17 @@
+{
+  "name": "jsonrpc-stdio-proxy",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "scripts": {
+    "fmt": "bun fmt:docs",
+    "fmt:docs": "prettier --write --ignore-unknown",
+    "fmt:docs:check": "prettier --check ."
+  },
+  "devDependencies": {
+    "prettier": "^3.3.3"
+  }
+}
