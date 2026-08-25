@@ -65,3 +65,8 @@ refactor(hooks): change useToast
 - fixes #1
 - added extra options
 ```
+
+---
+
+> [!CAUTION]
+> This file was compiled and written with AI assistance (Antigravity).

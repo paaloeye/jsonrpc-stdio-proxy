@@ -5,7 +5,6 @@ JSON-RPC servers (e.g. [MCP](https://modelcontextprotocol.io/specification/2026-
 or [DAP](https://microsoft.github.io/debug-adapter-protocol//specification.html)).
 
 It transparently forwards `stdio` streams while observing, measuring, and logging JSON payloads directly into **Apple's Unified Logging System (OSLog)**.
-This prevents log pollution on `stdout` (which would break the protocol) while providing complete observability and round-trip latency metrics into the process.
 
 ## Features
 
@@ -109,3 +108,8 @@ Errors: 0
 - [clap](https://docs.rs/clap)
 - [dashmap crate](https://github.com/xacrimon/dashmap)
 - [oslog crate](https://docs.rs/oslog)
+
+---
+
+> [!CAUTION]
+> This file was compiled and written with AI assistance (Antigravity).

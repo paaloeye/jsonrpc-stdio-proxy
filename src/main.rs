@@ -81,13 +81,10 @@ where
             let mut content_length: usize = 0;
             let mut bytes_acc = bytes_read;
 
-            match header_buf.trim().strip_prefix("Content-Length:") {
-                Some(len_str) => {
-                    if let Ok(len) = len_str.trim().parse::<usize>() {
-                        content_length = len;
-                    }
-                }
-                None => todo!(),
+            if let Some(len_str) = header_buf.trim().strip_prefix("Content-Length:")
+                && let Ok(len) = len_str.trim().parse::<usize>()
+            {
+                content_length = len;
             }
 
             writer.write_all(header_buf.as_bytes()).await?;

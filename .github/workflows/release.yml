@@ -1,0 +1,199 @@
+name: "📦 Release"
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build, Sign, Notarize & Release
+    runs-on: macos-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin, x86_64-apple-darwin
+
+      - name: Setup Rust cache
+        uses: Swatinem/rust-cache@v2
+
+      - name: Build universal binary (arm64 + x86_64)
+        run: |
+          cargo build --release --target aarch64-apple-darwin --verbose
+          cargo build --release --target x86_64-apple-darwin --verbose
+          mkdir -p target/release
+          lipo -create -output target/release/jsonrpc-stdio-proxy \
+            target/aarch64-apple-darwin/release/jsonrpc-stdio-proxy \
+            target/x86_64-apple-darwin/release/jsonrpc-stdio-proxy
+
+      - name: Smoke test universal binary
+        run: |
+          ./target/release/jsonrpc-stdio-proxy --version
+          ./target/release/jsonrpc-stdio-proxy --help
+
+      - name: Import signing certificate
+        if: env.SIGNING_CERTIFICATE_P12_BASE64 != ''
+        env:
+          SIGNING_CERTIFICATE_P12_BASE64: ${{ secrets.SIGNING_CERTIFICATE_P12_BASE64 }}
+          SIGNING_CERTIFICATE_PASSWORD: ${{ secrets.SIGNING_CERTIFICATE_PASSWORD }}
+        run: |
+          KEYCHAIN_PATH="${RUNNER_TEMP}/signing.keychain-db"
+          KEYCHAIN_PASSWORD="$(openssl rand -hex 32)"
+          security create-keychain -p "${KEYCHAIN_PASSWORD}" "${KEYCHAIN_PATH}"
+          security set-keychain-settings -lut 3600 "${KEYCHAIN_PATH}"
+          security unlock-keychain -p "${KEYCHAIN_PASSWORD}" "${KEYCHAIN_PATH}"
+          echo "${SIGNING_CERTIFICATE_P12_BASE64}" | base64 --decode > "${RUNNER_TEMP}/certificate.p12"
+          security import "${RUNNER_TEMP}/certificate.p12" \
+            -k "${KEYCHAIN_PATH}" \
+            -P "${SIGNING_CERTIFICATE_PASSWORD}" \
+            -T /usr/bin/codesign \
+            > /dev/null
+          security list-keychain -d user -s "${KEYCHAIN_PATH}"
+          security set-key-partition-list \
+            -S apple-tool:,apple:,codesign: \
+            -s -k "${KEYCHAIN_PASSWORD}" "${KEYCHAIN_PATH}"
+
+      - name: Write App Store Connect API key
+        if: vars.ASC_API_KEY_BASE64 != ''
+        env:
+          ASC_API_KEY_BASE64: ${{ vars.ASC_API_KEY_BASE64 }}
+          ASC_API_KEY_ID: ${{ vars.ASC_API_KEY_ID }}
+        run: |
+          mkdir -p "${RUNNER_TEMP}/private_keys"
+          echo "${ASC_API_KEY_BASE64}" | base64 --decode \
+            > "${RUNNER_TEMP}/private_keys/AuthKey_${ASC_API_KEY_ID}.p8"
+
+      - name: Code sign binary
+        if: env.SIGNING_IDENTITY != ''
+        env:
+          SIGNING_IDENTITY: ${{ secrets.SIGNING_IDENTITY }}
+        run: |
+          codesign --sign "${SIGNING_IDENTITY}" \
+            --force \
+            --options runtime \
+            --timestamp \
+            target/release/jsonrpc-stdio-proxy
+          codesign --verify --verbose target/release/jsonrpc-stdio-proxy
+
+      - name: Package release archives
+        run: |
+          mkdir -p .dist
+          VERSION="${GITHUB_REF_NAME:-v0.1.0}"
+          ARCHIVE_BASE="jsonrpc-stdio-proxy-${VERSION}-macos-universal"
+
+          # Stage archive contents
+          mkdir -p ".dist/${ARCHIVE_BASE}"
+          cp target/release/jsonrpc-stdio-proxy ".dist/${ARCHIVE_BASE}/"
+          cp README.md ".dist/${ARCHIVE_BASE}/"
+          cp LICENCE ".dist/${ARCHIVE_BASE}/"
+
+          # Create tar.gz and zip archives
+          tar -czf ".dist/${ARCHIVE_BASE}.tar.gz" -C .dist "${ARCHIVE_BASE}"
+          (cd .dist && zip -r "${ARCHIVE_BASE}.zip" "${ARCHIVE_BASE}")
+          rm -rf ".dist/${ARCHIVE_BASE}"
+
+          echo "ARCHIVE_BASE=${ARCHIVE_BASE}" >> $GITHUB_ENV
+
+      - name: Notarize release archive
+        if: env.ASC_API_KEY_ID != '' && env.ASC_ISSUER != ''
+        env:
+          ASC_API_KEY_ID: ${{ secrets.ASC_API_KEY_ID }}
+          ASC_ISSUER: ${{ secrets.ASC_ISSUER }}
+        run: |
+          API_KEY_PATH="${RUNNER_TEMP}/private_keys/AuthKey_${ASC_API_KEY_ID}.p8"
+          ZIP_FILE=".dist/${ARCHIVE_BASE}.zip"
+
+          echo "Submitting ${ZIP_FILE} for notarization..."
+          SUBMIT_OUTPUT=$(xcrun notarytool submit "${ZIP_FILE}" \
+            --key "${API_KEY_PATH}" \
+            --key-id "${ASC_API_KEY_ID}" \
+            --issuer "${ASC_ISSUER}" \
+            --wait 2>&1)
+          echo "${SUBMIT_OUTPUT}"
+
+          STATUS=$(echo "${SUBMIT_OUTPUT}" | grep -E "status:\s+Accepted" || true)
+          if [ -z "${STATUS}" ]; then
+            echo "::error::Notarization failed!"
+            exit 1
+          fi
+          echo "Notarization accepted."
+
+      - name: Generate Checksums & Summary
+        id: artifacts_info
+        run: |
+          cd .dist
+          shasum -a 256 *.tar.gz *.zip > checksums.txt
+          cat checksums.txt
+
+          echo "### Release Artifacts Complete 🎉" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Artifact | SHA256 Checksum |" >> $GITHUB_STEP_SUMMARY
+          echo "| :--- | :--- |" >> $GITHUB_STEP_SUMMARY
+          while read -r hash file; do
+            echo "| \`${file}\` | \`${hash}\` |" >> $GITHUB_STEP_SUMMARY
+          done < checksums.txt
+
+      - name: Upload dist artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist-artifacts-${{ github.sha }}
+          path: .dist/*
+          retention-days: 30
+          if-no-files-found: error
+
+      - name: Clean up keychain and API key
+        if: ${{ always() }}
+        env:
+          ASC_API_KEY_ID: ${{ secrets.ASC_API_KEY_ID }}
+        run: |
+          security delete-keychain "${RUNNER_TEMP}/signing.keychain-db" 2>/dev/null || true
+          rm -f "${RUNNER_TEMP}/certificate.p12"
+          rm -f "${RUNNER_TEMP}/private_keys/AuthKey_${ASC_API_KEY_ID}.p8"
+
+      - name: Extract tag version & prerelease flag
+        id: version
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/v}
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          case "$VERSION" in
+            *-*) echo "prerelease=true" >> $GITHUB_OUTPUT ;;
+            *) echo "prerelease=false" >> $GITHUB_OUTPUT ;;
+          esac
+
+      - name: Create GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v3
+        with:
+          files: |
+            .dist/*.tar.gz
+            .dist/*.zip
+            .dist/checksums.txt
+          generate_release_notes: true
+          prerelease: ${{ steps.version.outputs.prerelease }}
+          body: |
+            ## JSON-RPC Stdio Proxy ${{ github.ref_name }}
+
+            Single-binary transparent JSON-RPC to **Apple's Unified Logging System (OSLog)** proxy
+
+            ### Universal macOS Binary
+            Compiled and signed for both Apple Silicon (`arm64`) and Intel (`x86_64`) macOS.
+
+            ### Checksums
+            \`\`\`
+            ${{ steps.artifacts_info.outputs.checksums }}
+            \`\`\`
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
