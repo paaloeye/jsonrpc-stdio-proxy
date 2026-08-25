@@ -110,7 +110,7 @@ jobs:
         if: env.ASC_API_KEY_ID != '' && env.ASC_API_ISSUER != ''
         env:
           ASC_API_KEY_ID: ${{ vars.ASC_API_KEY_ID }}
-          ASC_ISSUER: ${{ vars.ASC_API_ISSUER }}
+          ASC_API_ISSUER: ${{ vars.ASC_API_ISSUER }}
         run: |
           API_KEY_PATH="${RUNNER_TEMP}/private_keys/AuthKey_${ASC_API_KEY_ID}.p8"
           ZIP_FILE=".dist/${ARCHIVE_BASE}.zip"
@@ -119,7 +119,7 @@ jobs:
           SUBMIT_OUTPUT=$(xcrun notarytool submit "${ZIP_FILE}" \
             --key "${API_KEY_PATH}" \
             --key-id "${ASC_API_KEY_ID}" \
-            --issuer "${ASC_ISSUER}" \
+            --issuer "${ASC_API_ISSUER}" \
             --wait 2>&1)
           echo "${SUBMIT_OUTPUT}"
 
@@ -136,6 +136,10 @@ jobs:
           cd .dist
           shasum -a 256 *.tar.gz *.zip > checksums.txt
           cat checksums.txt
+
+          echo "checksums<<EOF" >> "$GITHUB_OUTPUT"
+          cat checksums.txt >> "$GITHUB_OUTPUT"
+          echo "EOF" >> "$GITHUB_OUTPUT"
 
           echo "### Release Artifacts Complete 🎉" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
