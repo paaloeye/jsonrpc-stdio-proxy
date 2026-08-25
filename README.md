@@ -4,7 +4,7 @@ A lightweight, zero-configuration proxy that sits between JSON-RPC clients (e.g 
 JSON-RPC servers (e.g. [MCP](https://modelcontextprotocol.io/specification/2026-07-28), [LSP](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/),
 or [DAP](https://microsoft.github.io/debug-adapter-protocol//specification.html)).
 
-It transparently forwards `stdio` streams while observing, measuring, and logging JSON payloads directly into **Apple's Unified Logging System (OSLog)**.
+It transparently forwards `stdio` streams while observing, measuring, and logging JSON payloads directly into **AppleUnified Logging (OSLog)**.
 
 ## Features
 
@@ -25,7 +25,7 @@ cargo install --path .
 # The binary will be available at ~/.cargo/bin/jsonrpc-stdio-proxy
 ```
 
-## CLI Usage
+## Usage
 
 ```text
 Usage: jsonrpc-stdio-proxy [OPTIONS] -- <COMMAND>...
@@ -34,10 +34,8 @@ Arguments:
   <COMMAND>...  Target command and arguments to execute and proxy (must follow '--')
 
 Options:
-  -s, --subsystem <SUBSYSTEM>  macOS OSLog subsystem identifier for log filtering [default: com.paaloeye.jsonrpc-proxy]
-  -c, --category <CATEGORY>    macOS OSLog category identifier [default: default]
-  -h, --help                   Print help (see a summary with '-h')
-  -V, --version                Print version
+  -s, --subsystem <SUBSYSTEM>  macOS OSLog subsystem identifier for log filtering
+  -c, --category <CATEGORY>    macOS OSLog category identifier
 ```
 
 ## Examples
@@ -46,7 +44,7 @@ Options:
 
 ```sh
 # Proxy an MCP server with a custom subsystem identifier
-jsonrpc-stdio-proxy --subsystem com.example.mcp -- npx -y @modelcontextprotocol/server-memory
+jsonrpc-stdio-proxy --subsystem com.example.mcp -- bunx -y mongodb-mcp-server@latest
 
 # Proxy a Language Server Protocol (LSP) server
 jsonrpc-stdio-proxy -- rust-analyzer
@@ -74,9 +72,9 @@ Configure an MCP client to wrap any server command with the proxy:
 }
 ```
 
-## Viewing Logs (macOS)
+## Viewing Logs
 
-Because the proxy uses Apple's Unified Logging, you can view the traffic in real-time using the `log` CLI tool or the native `Console.app`.
+Because the proxy uses Apple Unified Logging, you can view the traffic in real-time using the `log` CLI tool or the native `Console.app`.
 
 ```sh
 # Stream proxy logs in real time on macOS

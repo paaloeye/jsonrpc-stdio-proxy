@@ -66,9 +66,9 @@ jobs:
             -s -k "${KEYCHAIN_PASSWORD}" "${KEYCHAIN_PATH}"
 
       - name: Write App Store Connect API key
-        if: vars.ASC_API_KEY_BASE64 != ''
+        if: env.ASC_API_KEY_BASE64 != ''
         env:
-          ASC_API_KEY_BASE64: ${{ vars.ASC_API_KEY_BASE64 }}
+          ASC_API_KEY_BASE64: ${{ secrets.ASC_API_KEY_BASE64 }}
           ASC_API_KEY_ID: ${{ vars.ASC_API_KEY_ID }}
         run: |
           mkdir -p "${RUNNER_TEMP}/private_keys"
@@ -78,7 +78,7 @@ jobs:
       - name: Code sign binary
         if: env.SIGNING_IDENTITY != ''
         env:
-          SIGNING_IDENTITY: ${{ secrets.SIGNING_IDENTITY }}
+          SIGNING_IDENTITY: ${{ vars.SIGNING_IDENTITY }}
         run: |
           codesign --sign "${SIGNING_IDENTITY}" \
             --force \
@@ -109,8 +109,8 @@ jobs:
       - name: Notarize release archive
         if: env.ASC_API_KEY_ID != '' && env.ASC_ISSUER != ''
         env:
-          ASC_API_KEY_ID: ${{ secrets.ASC_API_KEY_ID }}
-          ASC_ISSUER: ${{ secrets.ASC_ISSUER }}
+          ASC_API_KEY_ID: ${{ vars.ASC_API_KEY_ID }}
+          ASC_ISSUER: ${{ vars.ASC_ISSUER }}
         run: |
           API_KEY_PATH="${RUNNER_TEMP}/private_keys/AuthKey_${ASC_API_KEY_ID}.p8"
           ZIP_FILE=".dist/${ARCHIVE_BASE}.zip"
@@ -153,7 +153,6 @@ jobs:
           retention-days: 30
           if-no-files-found: error
           include-hidden-files: true
-          archive: false
 
       - name: Clean up keychain and API key
         if: ${{ always() }}
@@ -188,7 +187,7 @@ jobs:
           body: |
             ## JSON-RPC Stdio Proxy ${{ github.ref_name }}
 
-            Single-binary transparent JSON-RPC to **Apple's Unified Logging System (OSLog)** proxy
+            Single-binary transparent JSON-RPC to **Apple Unified Logging (OSLog)** proxy
 
             ### Universal macOS Binary
             Compiled and signed for both Apple Silicon (`arm64`) and Intel (`x86_64`) macOS.
