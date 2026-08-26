@@ -24,16 +24,28 @@ It transparently forwards `stdio` streams while observing, measuring, and loggin
 
 ---
 
-## Installation / Building
+## Installation
+
+### Homebrew
 
 ```sh
-# Build debug binary
-cargo build
-
-# Build release binary
-cargo install --path .
-# The binary will be available at ~/.cargo/bin/jsonrpc-stdio-proxy
+# Install latest release (universal binary)
+brew install paaloeye/tap/jsonrpc-stdio-proxy
 ```
+
+### Cargo
+
+```sh
+# Install directly from GitHub
+cargo install --git https://github.com/paaloeye/jsonrpc-stdio-proxy.git
+
+# Or install from local source
+cargo install --path .
+```
+
+### Direct Download (GitHub Releases)
+
+Download pre-built, signed, and notarised universal binaries from [GitHub Releases](https://github.com/paaloeye/jsonrpc-stdio-proxy/releases).
 
 ---
 

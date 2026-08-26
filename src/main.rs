@@ -1,3 +1,11 @@
+//
+//  SPDX-License-Identifier: MIT
+//  Copyright (c) 2026 Paal Øye-Strømme
+//
+//  main.rs
+//  jsonrpc-stdio-proxy
+//
+
 use clap::Parser;
 use dashmap::DashMap;
 use log::{debug, error, info};
